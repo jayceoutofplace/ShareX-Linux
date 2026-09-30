@@ -1,24 +1,67 @@
-﻿using Avalonia;
+﻿using Avalonia.Controls;
+﻿using Avalonia.Threading;
+using ShareX.AvaloniaUI.Integration;
+using ShareX.AvaloniaUI.Theming;
 using System;
+using System.Threading.Tasks;
 
 namespace ShareX.Linux;
 
-class Program
+internal static class Program
 {
     // Initialization code. Don't use any Avalonia, third-party APIs or any
     // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
     // yet and stuff might break.
     [STAThread]
-    public static void Main(string[] args) => BuildAvaloniaApp()
-        .StartWithClassicDesktopLifetime(args);
+    public static void Main(string[] args){
+        AvaloniaBootstrapper.Initialize(
+            args,
+            startup: async () =>
+            {
+                ThemeManager.Configure(new ApplicationThemeOptions());
 
-    // Avalonia configuration, don't remove; also used by visual designer.
-    public static AppBuilder BuildAvaloniaApp()
-        => AppBuilder.Configure<App>()
-            .UsePlatformDetect()
-#if DEBUG
-            .WithDeveloperTools()
-#endif
-            .WithInterFont()
-            .LogToTrace();
+
+                var capBtn = new Button{
+                    Content = "Press 2 captureee",
+                    FontSize = 18,
+                    Margin = new Avalonia.Thickness(30),
+                    Padding = new Avalonia.Thickness(20,10)
+                };
+
+                    capBtn.Click+=async (_,_) => {
+                        var proc = new System.Diagnostics.Process{
+                            StartInfo = new System.Diagnostics.ProcessStartInfo{
+                                FileName = "gdbus",
+                                Arguments =
+                                        "call --session " +
+                                        "--dest org.freedesktop.portal.Desktop " +
+                                        "--object-path /org/freedesktop/portal/desktop " +
+                                        "--method org.freedesktop.portal.Screenshot.Screenshot " +
+                                        "\"\" \"{'interactive': <true>}\"",
+                                UseShellExecute = false,
+                                RedirectStandardOutput = true,
+                                RedirectStandardError = true
+                            }
+                        };
+                        proc.Start();
+                        string output = await proc.StandardOutput.ReadToEndAsync();
+                        await proc.WaitForExitAsync();
+                        Console.WriteLine(output);
+                };
+
+                var window = new Window{
+                    Title = "ShareX GAY PORT",
+                    Width = 1000,
+                    Height = 650,
+                    Content = capBtn,
+                };
+
+                window.Show();
+                await Task.CompletedTask;
+            },
+            shutdown: () => { }
+
+        );
+        AvaloniaBootstrapper.Run();
+    }
 }
